@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RaspNVR — Paramètres</title>
+  <link rel="stylesheet" href="/static/style.css?v=4">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1 data-app-name>RaspNVR</h1>
+      <nav class="main-nav">
+        <a href="/" class="nav-link">Live</a>
+        <a href="/cameras" class="nav-link">Caméras</a>
+        <a href="/settings" class="nav-link active">Paramètres</a>
+      </nav>
+    </div>
+    <div class="topbar-right">
+      <a href="/" class="btn-secondary">← Live</a>
+    </div>
+  </header>
+
+  <main class="manage-page settings-page">
+    <section class="panel">
+      <h2>Nom de l'application</h2>
+      <p class="hint">Affiché en haut de chaque page (ex. titre du magasin).</p>
+      <form id="app-name-form" class="form-grid settings-form">
+        <label class="full">Nom
+          <input name="app_name" required maxlength="64" placeholder="RaspNVR">
+        </label>
+        <button type="submit">Enregistrer</button>
+      </form>
+      <p id="app-name-msg" class="success-msg" hidden></p>
+      <p id="app-name-error" class="error" hidden></p>
+    </section>
+
+    <section class="panel">
+      <h2>Nom du Raspberry Pi (hostname)</h2>
+      <p class="hint">Accès mDNS : <code>http://<span id="hostname-preview">raspnvr-mag01</span>.local:8080</code></p>
+      <form id="hostname-form" class="form-grid settings-form">
+        <label class="full">Hostname
+          <input name="hostname" required maxlength="63" pattern="[a-z0-9][a-z0-9-]*" placeholder="raspnvr-m02">
+        </label>
+        <button type="submit">Appliquer</button>
+      </form>
+      <p id="hostname-msg" class="success-msg" hidden></p>
+      <p id="hostname-error" class="error" hidden></p>
+    </section>
+
+    <section class="panel">
+      <h2>Serveur central</h2>
+      <p class="hint">Enregistrez ce Pi auprès du central Vercel ou du mock local (<code>/admin</code>).</p>
+      <form id="central-form" class="form-grid settings-form">
+        <label class="full">URL centrale
+          <input name="central_url" placeholder="https://raspnvr-central.vercel.app ou http://IP:8080">
+        </label>
+        <label class="full">Code magasin
+          <input name="store_code" placeholder="mag01">
+        </label>
+        <label class="full">Token d'enregistrement
+          <input name="registration_token" placeholder="Token généré dans l'admin central">
+        </label>
+        <label class="full">URL tunnel (Cloudflare)
+          <input name="tunnel_url" placeholder="https://mag01.votredomaine.fr">
+        </label>
+        <button type="submit">Enregistrer / connecter</button>
+      </form>
+      <p id="central-msg" class="success-msg" hidden></p>
+      <p id="central-error" class="error" hidden></p>
+      <dl class="manage-meta info-dl">
+        <dt>Agent</dt><dd id="info-agent">—</dd>
+        <dt>Dernière heartbeat</dt><dd id="info-heartbeat">—</dd>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <h2>Informations</h2>
+      <dl class="manage-meta info-dl">
+        <dt>Code magasin</dt><dd id="info-store">—</dd>
+        <dt>Hostname actuel</dt><dd id="info-hostname">—</dd>
+      </dl>
+    </section>
+  </main>
+
+  <script src="/static/branding.js"></script>
+  <script src="/static/settings.js?v=2"></script>
+</body>
+</html>

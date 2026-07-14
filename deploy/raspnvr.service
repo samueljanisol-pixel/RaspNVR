@@ -1,0 +1,25 @@
+[Unit]
+Description=RaspNVR edge NVR server
+After=network.target mediamtx.service
+Wants=mediamtx.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/raspnvr
+Environment=RASPNVR_DATA_DIR=/opt/raspnvr/data
+Environment=RASPNVR_RECORDINGS_DIR=/mnt/raspnvr/recordings
+Environment=RASPNVR_HOST=0.0.0.0
+Environment=RASPNVR_PORT=8080
+Environment=RASPNVR_STORE_CODE=mag01
+Environment=RASPNVR_CENTRAL_MOCK=true
+Environment=RASPNVR_AGENT_ENABLED=true
+Environment=RASPNVR_STORAGE_UPLOAD_ENABLED=false
+EnvironmentFile=-/opt/raspnvr/data/raspnvr.env
+ExecStart=/opt/raspnvr/venv/bin/uvicorn src.main:app --host 0.0.0.0 --port 8080
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,81 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --panel: #1e293b;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #60a5fa;
+  --ok: #86efac;
+  --warn: #fbbf24;
+  --err: #f87171;
+  --border: #334155;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.topbar h1 { margin: 0; font-size: 1.25rem; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.card {
+  background: #111827;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.badge.ok { background: #14532d; color: var(--ok); }
+.badge.off { background: #450a0a; color: var(--err); }
+.btn {
+  background: var(--accent);
+  color: #0f172a;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn.secondary { background: #334155; color: var(--text); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+input, select {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #0b1220;
+  color: var(--text);
+}
+label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--muted); }
+.meta { color: var(--muted); font-size: 0.85rem; }
+.error { color: var(--err); }
+.success { color: var(--ok); }
+.video-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+video { width: 100%; background: #000; border-radius: 6px; }

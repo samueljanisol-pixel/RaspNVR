@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RaspNVR — Caméras</title>
+  <link rel="stylesheet" href="/static/style.css?v=4">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1 data-app-name>RaspNVR</h1>
+      <nav class="main-nav">
+        <a href="/" class="nav-link">Live</a>
+        <a href="/cameras" class="nav-link active">Caméras</a>
+        <a href="/settings" class="nav-link">Paramètres</a>
+      </nav>
+    </div>
+    <div class="topbar-right">
+      <a href="/" class="btn-secondary">← Live</a>
+    </div>
+  </header>
+
+  <main class="manage-page">
+    <section class="panel">
+      <h2>Ajouter une caméra</h2>
+      <form id="add-form" class="form-grid">
+        <label>Nom <input name="name" required placeholder="Entrée magasin"></label>
+        <label>IP caméra <input name="ip" placeholder="192.168.0.201"></label>
+        <label>Utilisateur <input name="user" value="admin"></label>
+        <label>Mot de passe <input name="password" type="password"></label>
+        <label class="full">URL RTSP complète (optionnel)
+          <input name="rtsp_url" placeholder="rtsp://admin:...@192.168.0.201:554/Streaming/channels/101">
+        </label>
+        <button type="submit" class="full">Ajouter</button>
+      </form>
+      <p id="add-error" class="error" hidden></p>
+    </section>
+
+    <section class="panel">
+      <h2>Caméras enregistrées</h2>
+      <div id="camera-list" class="camera-list"></div>
+      <p id="list-empty" class="empty-msg" hidden>Aucune caméra configurée.</p>
+    </section>
+  </main>
+
+  <dialog id="edit-dialog">
+    <form id="edit-form" method="dialog">
+      <h3>Modifier la caméra</h3>
+      <input type="hidden" name="id">
+      <label>Nom <input name="name" required></label>
+      <label>URL RTSP substream (enregistrement) <input name="rtsp_sub" required></label>
+      <label>URL RTSP main stream (live HD) <input name="rtsp_main"></label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="enabled" checked> Caméra active
+      </label>
+      <div class="dialog-actions">
+        <button type="button" id="edit-cancel" class="btn-secondary">Annuler</button>
+        <button type="submit">Enregistrer</button>
+      </div>
+      <p id="edit-error" class="error" hidden></p>
+    </form>
+  </dialog>
+
+  <script src="/static/branding.js"></script>
+  <script src="/static/common.js?v=2"></script>
+  <script src="/static/cameras.js?v=2"></script>
+</body>
+</html>

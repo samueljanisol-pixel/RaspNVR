@@ -1,0 +1,15 @@
+[Unit]
+Description=Cloudflare Tunnel for RaspNVR edge
+After=network-online.target raspnvr.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+EnvironmentFile=-/opt/raspnvr/data/cloudflared.env
+ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

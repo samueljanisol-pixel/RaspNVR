@@ -1,0 +1,15 @@
+# MediaMTX — flux live HLS pour RaspNVR
+# Les chemins camX sont ajoutés dynamiquement via l'API (port 9997)
+
+logLevel: info
+api: yes
+apiAddress: 127.0.0.1:9997
+
+rtsp: yes
+rtspAddress: :8554
+
+hls: yes
+hlsAddress: :8888
+hlsAllowOrigin: '*'
+
+paths: {}

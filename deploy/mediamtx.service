@@ -1,0 +1,14 @@
+[Unit]
+Description=MediaMTX RTSP/HLS proxy for RaspNVR
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+ExecStart=/opt/raspnvr/bin/mediamtx /opt/raspnvr/deploy/mediamtx.yml
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

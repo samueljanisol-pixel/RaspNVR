@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RaspNVR — Live</title>
+  <link rel="stylesheet" href="/static/style.css?v=4">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+</head>
+<body class="page-live">
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1 data-app-name>RaspNVR</h1>
+      <nav class="main-nav">
+        <a href="/" class="nav-link active">Live</a>
+        <a href="/cameras" class="nav-link">Caméras</a>
+        <a href="/settings" class="nav-link">Paramètres</a>
+      </nav>
+      <div id="status" class="status">Chargement…</div>
+    </div>
+    <div class="topbar-right">
+      <div class="layout-picker" role="group" aria-label="Disposition des caméras">
+        <button type="button" class="layout-btn" data-layout="1" title="1 caméra">1</button>
+        <button type="button" class="layout-btn active" data-layout="4" title="4 caméras">4</button>
+        <button type="button" class="layout-btn" data-layout="9" title="9 caméras">9</button>
+      </div>
+      <a href="/cameras" class="btn-secondary">Gérer</a>
+    </div>
+  </header>
+
+  <nav id="camera-tabs" class="camera-tabs" hidden></nav>
+
+  <main class="live-view">
+    <p class="view-hint">Ctrl + molette ou pincement pour zoomer · glisser si zoomé · double-clic = plein écran</p>
+    <div id="grid" class="grid layout-4"></div>
+    <p id="empty-msg" class="empty-msg" hidden>Aucune caméra enregistrée. <a href="/cameras">Ajouter une caméra</a></p>
+  </main>
+
+  <script src="/static/branding.js"></script>
+  <script src="/static/common.js?v=2"></script>
+  <script src="/static/app.js?v=5"></script>
+</body>
+</html>
