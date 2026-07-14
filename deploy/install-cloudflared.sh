@@ -25,24 +25,34 @@ chmod +x /usr/local/bin/cloudflared
 
 INSTALL_DIR="/opt/raspnvr"
 cp "${INSTALL_DIR}/deploy/cloudflared.service" /etc/systemd/system/cloudflared.service
+cp "${INSTALL_DIR}/deploy/cloudflared-quick.service" /etc/systemd/system/cloudflared-quick.service
+chmod +x "${INSTALL_DIR}/deploy/sync-tunnel-url.sh"
 
 ENV_FILE="${INSTALL_DIR}/data/cloudflared.env"
 if [[ ! -f "${ENV_FILE}" ]]; then
   cat > "${ENV_FILE}" <<'EOF'
-# Token tunnel Cloudflare (dashboard Zero Trust > Tunnels)
+# Mode token (production) — dashboard Cloudflare Zero Trust > Tunnels
 # CLOUDFLARE_TUNNEL_TOKEN=eyJ...
+#
+# Mode quick (test) — laisser le token commenté, utiliser cloudflared-quick.service
 EOF
   chown pi:pi "${ENV_FILE}"
 fi
 
-echo "==> cloudflared.service (désactivé tant que CLOUDFLARE_TUNNEL_TOKEN absent)"
+echo "==> cloudflared (token ou quick tunnel)"
 systemctl daemon-reload
+systemctl disable cloudflared-quick 2>/dev/null || true
+systemctl disable cloudflared 2>/dev/null || true
+
 if grep -q '^CLOUDFLARE_TUNNEL_TOKEN=' "${ENV_FILE}" 2>/dev/null; then
   systemctl enable cloudflared
   systemctl restart cloudflared || true
+  echo "Tunnel token actif (cloudflared.service)"
 else
-  systemctl disable cloudflared 2>/dev/null || true
-  echo "Ajoutez CLOUDFLARE_TUNNEL_TOKEN dans ${ENV_FILE} puis: sudo systemctl enable --now cloudflared"
+  systemctl enable cloudflared-quick
+  systemctl restart cloudflared-quick || true
+  bash "${INSTALL_DIR}/deploy/sync-tunnel-url.sh" cloudflared-quick || true
+  echo "Quick tunnel actif (trycloudflare.com) — URL dans ${INSTALL_DIR}/data/tunnel_url"
 fi
 
 echo "==> URL tunnel publique (optionnelle)"

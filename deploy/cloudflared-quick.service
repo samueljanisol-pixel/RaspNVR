@@ -1,0 +1,16 @@
+[Unit]
+Description=Cloudflare Quick Tunnel for RaspNVR (trycloudflare.com)
+After=network-online.target raspnvr.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080
+Restart=on-failure
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
