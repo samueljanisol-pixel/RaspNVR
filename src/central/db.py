@@ -121,6 +121,76 @@ async def get_store_by_code(code: str) -> Optional[dict[str, Any]]:
         return dict(row) if row else None
 
 
+def _validate_store_code(code: str) -> str:
+    import re
+
+    code = code.strip().lower()
+    if not re.match(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$", code):
+        raise ValueError("Code magasin invalide (lettres minuscules, chiffres, tirets)")
+    return code
+
+
+async def create_store(*, code: str, name: str, sort_order: int | None = None) -> dict[str, Any]:
+    code = _validate_store_code(code)
+    name = name.strip()
+    if not name:
+        raise ValueError("Nom du magasin requis")
+    store_id = str(uuid.uuid4())
+    async with get_connection() as db:
+        if sort_order is None:
+            row = await (await db.execute("SELECT MAX(sort_order) AS m FROM stores")).fetchone()
+            sort_order = int(row["m"] or 0) + 1
+        try:
+            await db.execute(
+                "INSERT INTO stores (id, code, name, sort_order) VALUES (?, ?, ?, ?)",
+                (store_id, code, name, sort_order),
+            )
+            await db.commit()
+        except aiosqlite.IntegrityError as exc:
+            raise ValueError("Ce code magasin existe déjà") from exc
+        row = await (await db.execute("SELECT * FROM stores WHERE id = ?", (store_id,))).fetchone()
+        return dict(row)
+
+
+async def update_store(
+    store_id: str,
+    *,
+    name: str | None = None,
+    code: str | None = None,
+    sort_order: int | None = None,
+) -> Optional[dict[str, Any]]:
+    async with get_connection() as db:
+        row = await (await db.execute("SELECT id FROM stores WHERE id = ?", (store_id,))).fetchone()
+        if not row:
+            return None
+        updates: list[str] = []
+        values: list[Any] = []
+        if name is not None:
+            trimmed = name.strip()
+            if not trimmed:
+                raise ValueError("Nom du magasin requis")
+            updates.append("name = ?")
+            values.append(trimmed)
+        if code is not None:
+            updates.append("code = ?")
+            values.append(_validate_store_code(code))
+        if sort_order is not None:
+            updates.append("sort_order = ?")
+            values.append(sort_order)
+        if updates:
+            values.append(store_id)
+            try:
+                await db.execute(
+                    f"UPDATE stores SET {', '.join(updates)} WHERE id = ?",
+                    values,
+                )
+                await db.commit()
+            except aiosqlite.IntegrityError as exc:
+                raise ValueError("Ce code magasin existe déjà") from exc
+        out = await (await db.execute("SELECT * FROM stores WHERE id = ?", (store_id,))).fetchone()
+        return dict(out) if out else None
+
+
 async def create_registration_token(store_id: str, *, expires_hours: int = 48) -> str:
     token = generate_token(24)
     token_hash = hash_secret(token)

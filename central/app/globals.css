@@ -79,3 +79,10 @@ label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--
 .success { color: var(--ok); }
 .video-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
 video { width: 100%; background: #000; border-radius: 6px; }
+
+.store-form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 420px;
+  margin-bottom: 0.5rem;
+}

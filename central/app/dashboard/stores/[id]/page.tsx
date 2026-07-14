@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -44,28 +44,31 @@ export default function StoreDetailPage() {
   const [token, setToken] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editCode, setEditCode] = useState('');
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
 
-  useEffect(() => {
+  const loadDetail = useCallback(async () => {
     const key = sessionStorage.getItem('raspnvr_admin_key');
     if (!key) {
       router.replace('/login');
       return;
     }
-    fetch(`/api/raspnvr/admin/stores/${params.id}`, { headers: adminHeaders() })
-      .then(async (res) => {
-        if (res.status === 401) {
-          router.replace('/login');
-          return null;
-        }
-        if (!res.ok) throw new Error('Magasin introuvable');
-        return res.json();
-      })
-      .then((data) => {
-        if (data) setDetail(data);
-      })
-      .catch((err) => setError(String(err)));
+    const res = await fetch(`/api/raspnvr/admin/stores/${params.id}`, { headers: adminHeaders() });
+    if (res.status === 401) {
+      router.replace('/login');
+      return;
+    }
+    if (!res.ok) throw new Error('Magasin introuvable');
+    const data = await res.json();
+    setDetail(data);
+    setEditName(data.store.name);
+    setEditCode(data.store.code);
   }, [params.id, router]);
+
+  useEffect(() => {
+    loadDetail().catch((err) => setError(String(err)));
+  }, [loadDetail]);
 
   useEffect(() => {
     if (!detail?.device?.tunnel_url) return;
@@ -87,6 +90,24 @@ export default function StoreDetailPage() {
       }
     });
   }, [detail]);
+
+  async function saveStore(event: React.FormEvent) {
+    event.preventDefault();
+    setMsg('');
+    setError('');
+    const res = await fetch(`/api/raspnvr/admin/stores/${params.id}`, {
+      method: 'PATCH',
+      headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: editName, code: editCode }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.detail || 'Erreur lors de la sauvegarde');
+      return;
+    }
+    setMsg('Magasin mis à jour.');
+    await loadDetail();
+  }
 
   async function createToken() {
     setMsg('');
@@ -144,6 +165,26 @@ export default function StoreDetailPage() {
         <Link href="/dashboard">← Magasins</Link>
       </header>
       <main className="container">
+        <section className="panel">
+          <h3>Informations magasin</h3>
+          <form onSubmit={saveStore} className="store-form">
+            <label>
+              Nom
+              <input value={editName} onChange={(e) => setEditName(e.target.value)} required />
+            </label>
+            <label>
+              Code
+              <input
+                value={editCode}
+                onChange={(e) => setEditCode(e.target.value)}
+                pattern="[a-z0-9][a-z0-9-]*"
+                required
+              />
+            </label>
+            <button className="btn secondary" type="submit">Enregistrer</button>
+          </form>
+        </section>
+
         <section className="panel">
           <h3>Statut</h3>
           <p className="meta">

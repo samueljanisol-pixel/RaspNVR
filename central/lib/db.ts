@@ -311,4 +311,79 @@ export function newApiKey(): string {
   return generateToken(32);
 }
 
+const STORE_CODE_RE = /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$|^[a-z0-9]$/;
+
+export function normalizeStoreCode(code: string): string {
+  return code.trim().toLowerCase();
+}
+
+export function validateStoreCode(code: string): string {
+  const normalized = normalizeStoreCode(code);
+  if (!STORE_CODE_RE.test(normalized)) {
+    throw new Error('Code magasin invalide (lettres minuscules, chiffres, tirets)');
+  }
+  return normalized;
+}
+
+export async function createStore(code: string, name: string, sortOrder = 0) {
+  const sb = getSupabaseAdmin();
+  const normalizedCode = validateStoreCode(code);
+  const trimmedName = name.trim();
+  if (!trimmedName) throw new Error('Nom du magasin requis');
+
+  const { data: maxRow } = await sb
+    .from('raspnvr_stores')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const order = sortOrder || ((maxRow?.sort_order as number) || 0) + 1;
+
+  const { data, error } = await sb
+    .from('raspnvr_stores')
+    .insert({ code: normalizedCode, name: trimmedName, sort_order: order })
+    .select('*')
+    .single();
+  if (error) {
+    if (error.code === '23505') throw new Error('Ce code magasin existe déjà');
+    throw error;
+  }
+  return data as StoreRow;
+}
+
+export async function updateStore(
+  storeId: string,
+  fields: { name?: string; code?: string; sort_order?: number },
+) {
+  const sb = getSupabaseAdmin();
+  const payload: Record<string, string | number> = {};
+  if (fields.name !== undefined) {
+    const trimmed = fields.name.trim();
+    if (!trimmed) throw new Error('Nom du magasin requis');
+    payload.name = trimmed;
+  }
+  if (fields.code !== undefined) {
+    payload.code = validateStoreCode(fields.code);
+  }
+  if (fields.sort_order !== undefined) {
+    payload.sort_order = fields.sort_order;
+  }
+  if (!Object.keys(payload).length) {
+    const { data } = await sb.from('raspnvr_stores').select('*').eq('id', storeId).maybeSingle();
+    return data as StoreRow | null;
+  }
+
+  const { data, error } = await sb
+    .from('raspnvr_stores')
+    .update(payload)
+    .eq('id', storeId)
+    .select('*')
+    .maybeSingle();
+  if (error) {
+    if (error.code === '23505') throw new Error('Ce code magasin existe déjà');
+    throw error;
+  }
+  return data as StoreRow | null;
+}
+
 export { generateToken };

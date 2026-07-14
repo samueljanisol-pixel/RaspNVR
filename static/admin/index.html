@@ -19,11 +19,35 @@
 
   <main class="manage-page">
     <section class="panel">
+      <h2>Ajouter un magasin</h2>
+      <form id="add-store-form" class="form-grid settings-form" style="max-width:420px">
+        <label class="full">Code
+          <input name="code" required pattern="[a-z0-9][a-z0-9-]*" placeholder="mag02">
+        </label>
+        <label class="full">Nom
+          <input name="name" required placeholder="Magasin Centre">
+        </label>
+        <button type="submit">Ajouter</button>
+      </form>
+      <p id="add-store-msg" class="success-msg" hidden></p>
+      <p id="add-store-error" class="error" hidden></p>
+    </section>
+    <section class="panel">
       <h2>Magasins</h2>
       <div id="stores" class="manage-list"></div>
     </section>
     <section class="panel" id="detail-panel" hidden>
       <h2 id="detail-title">Magasin</h2>
+      <form id="edit-store-form" class="form-grid settings-form" style="max-width:420px">
+        <label class="full">Nom
+          <input name="name" required>
+        </label>
+        <label class="full">Code
+          <input name="code" required pattern="[a-z0-9][a-z0-9-]*">
+        </label>
+        <button type="submit">Enregistrer</button>
+      </form>
+      <p id="edit-store-msg" class="success-msg" hidden></p>
       <div id="detail-meta" class="manage-meta"></div>
       <div class="form-grid settings-form" style="max-width:520px">
         <button type="button" id="btn-token" class="btn-secondary">Générer token enregistrement</button>

@@ -6,6 +6,12 @@ function adminHeaders() {
 
 let selectedStoreId = null;
 
+function showMsg(id, text) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.hidden = !text;
+}
+
 async function loadStores() {
   const res = await fetch('/api/raspnvr/admin/stores', { headers: adminHeaders() });
   const data = await res.json();
@@ -33,8 +39,11 @@ async function openStore(id, name) {
   document.getElementById('detail-title').textContent = name;
   const res = await fetch(`/api/raspnvr/admin/stores/${id}`, { headers: adminHeaders() });
   const data = await res.json();
+  const store = data.store || {};
   const device = data.device || {};
   const status = device.last_status || {};
+  document.querySelector('#edit-store-form [name=name]').value = store.name || name;
+  document.querySelector('#edit-store-form [name=code]').value = store.code || '';
   document.getElementById('detail-meta').innerHTML = `
     <p>Hostname : ${device.hostname || '—'}</p>
     <p>Tunnel : ${device.tunnel_url ? `<a href="${device.tunnel_url}">${device.tunnel_url}</a>` : '—'}</p>
@@ -79,6 +88,52 @@ async function openStore(id, name) {
     recList.appendChild(li);
   }
 }
+
+document.getElementById('add-store-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  showMsg('add-store-error', '');
+  showMsg('add-store-msg', '');
+  const form = new FormData(event.target);
+  const res = await fetch('/api/raspnvr/admin/stores', {
+    method: 'POST',
+    headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      code: form.get('code'),
+      name: form.get('name'),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showMsg('add-store-error', data.detail || 'Erreur');
+    return;
+  }
+  event.target.reset();
+  showMsg('add-store-msg', `Magasin « ${data.store.name} » créé.`);
+  loadStores();
+});
+
+document.getElementById('edit-store-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!selectedStoreId) return;
+  showMsg('edit-store-msg', '');
+  const form = new FormData(event.target);
+  const res = await fetch(`/api/raspnvr/admin/stores/${selectedStoreId}`, {
+    method: 'PATCH',
+    headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: form.get('name'),
+      code: form.get('code'),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showMsg('edit-store-msg', data.detail || 'Erreur');
+    return;
+  }
+  document.getElementById('detail-title').textContent = data.store.name;
+  showMsg('edit-store-msg', 'Magasin mis à jour.');
+  loadStores();
+});
 
 document.getElementById('btn-token').addEventListener('click', async () => {
   if (!selectedStoreId) return;

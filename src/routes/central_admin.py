@@ -19,6 +19,18 @@ class CommandCreate(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
+class StoreCreate(BaseModel):
+    code: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=120)
+    sort_order: int | None = None
+
+
+class StoreUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    code: str | None = Field(default=None, min_length=1, max_length=64)
+    sort_order: int | None = None
+
+
 def _require_admin(authorization: Optional[str] = Header(default=None)) -> None:
     if not settings.admin_api_key:
         return
@@ -59,6 +71,23 @@ async def list_stores(authorization: Optional[str] = Header(default=None)) -> di
     return {"stores": rows}
 
 
+@router.post("/stores")
+async def create_store(
+    body: StoreCreate,
+    authorization: Optional[str] = Header(default=None),
+) -> dict[str, Any]:
+    _require_admin(authorization)
+    try:
+        store = await central_db.create_store(
+            code=body.code,
+            name=body.name,
+            sort_order=body.sort_order,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"store": store}
+
+
 @router.get("/stores/{store_id}")
 async def get_store(store_id: str, authorization: Optional[str] = Header(default=None)) -> dict[str, Any]:
     _require_admin(authorization)
@@ -69,6 +98,27 @@ async def get_store(store_id: str, authorization: Optional[str] = Header(default
     if device:
         device["online"] = _device_online(device.get("last_seen_at"))
     return detail
+
+
+@router.patch("/stores/{store_id}")
+async def update_store(
+    store_id: str,
+    body: StoreUpdate,
+    authorization: Optional[str] = Header(default=None),
+) -> dict[str, Any]:
+    _require_admin(authorization)
+    try:
+        store = await central_db.update_store(
+            store_id,
+            name=body.name,
+            code=body.code,
+            sort_order=body.sort_order,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not store:
+        raise HTTPException(status_code=404, detail="Magasin introuvable")
+    return {"store": store}
 
 
 @router.post("/stores/{store_id}/token")

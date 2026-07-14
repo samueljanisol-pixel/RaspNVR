@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -29,27 +29,49 @@ export default function DashboardPage() {
   const router = useRouter();
   const [stores, setStores] = useState<StoreRow[]>([]);
   const [error, setError] = useState('');
+  const [msg, setMsg] = useState('');
+  const [newCode, setNewCode] = useState('');
+  const [newName, setNewName] = useState('');
 
-  useEffect(() => {
+  const loadStores = useCallback(async () => {
     const key = sessionStorage.getItem('raspnvr_admin_key');
     if (!key) {
       router.replace('/login');
       return;
     }
-    fetch('/api/raspnvr/admin/stores', { headers: adminHeaders() })
-      .then(async (res) => {
-        if (res.status === 401) {
-          router.replace('/login');
-          return null;
-        }
-        if (!res.ok) throw new Error('Chargement impossible');
-        return res.json();
-      })
-      .then((data) => {
-        if (data) setStores(data.stores || []);
-      })
-      .catch((err) => setError(String(err)));
+    const res = await fetch('/api/raspnvr/admin/stores', { headers: adminHeaders() });
+    if (res.status === 401) {
+      router.replace('/login');
+      return;
+    }
+    if (!res.ok) throw new Error('Chargement impossible');
+    const data = await res.json();
+    setStores(data.stores || []);
   }, [router]);
+
+  useEffect(() => {
+    loadStores().catch((err) => setError(String(err)));
+  }, [loadStores]);
+
+  async function onAddStore(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+    setMsg('');
+    const res = await fetch('/api/raspnvr/admin/stores', {
+      method: 'POST',
+      headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: newCode, name: newName }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.detail || 'Erreur lors de la création');
+      return;
+    }
+    setNewCode('');
+    setNewName('');
+    setMsg(`Magasin « ${data.store.name} » créé.`);
+    await loadStores();
+  }
 
   return (
     <>
@@ -67,6 +89,33 @@ export default function DashboardPage() {
         </button>
       </header>
       <main className="container">
+        <section className="panel">
+          <h2>Ajouter un magasin</h2>
+          <form onSubmit={onAddStore} className="store-form">
+            <label>
+              Code
+              <input
+                value={newCode}
+                onChange={(e) => setNewCode(e.target.value)}
+                placeholder="mag02"
+                pattern="[a-z0-9][a-z0-9-]*"
+                required
+              />
+            </label>
+            <label>
+              Nom
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Magasin Centre"
+                required
+              />
+            </label>
+            <button className="btn" type="submit">Ajouter</button>
+          </form>
+          {msg && <p className="success">{msg}</p>}
+        </section>
+
         <h2>Magasins</h2>
         {error && <p className="error">{error}</p>}
         <div className="grid">
