@@ -16,6 +16,7 @@ type Props = {
   sublabel?: string;
   hidden?: boolean;
   soloHighlight?: boolean;
+  withAudio?: boolean;
   onDoubleClick?: () => void;
 };
 
@@ -43,7 +44,7 @@ function getHlsCtor(): HlsCtor | undefined {
 }
 
 export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlayer(
-  { src, label, sublabel, hidden, soloHighlight, onDoubleClick },
+  { src, label, sublabel, hidden, soloHighlight, withAudio = false, onDoubleClick },
   ref,
 ) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -62,6 +63,15 @@ export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlaye
   useEffect(() => {
     setRetryCount(0);
   }, [src]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !withAudio;
+    if (withAudio && connState === 'playing') {
+      video.play().catch(() => {});
+    }
+  }, [withAudio, connState]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -211,7 +221,7 @@ export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlaye
           <div className="video-zoom">
             <video
               ref={videoRef}
-              muted
+              muted={!withAudio}
               autoPlay
               playsInline
               disablePictureInPicture

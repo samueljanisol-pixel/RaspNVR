@@ -252,6 +252,7 @@ export default function DashboardPage() {
       {!isFullscreen && displayCameras.length > 0 && (
         <p className="view-hint">
           Ctrl + molette ou pincement pour zoomer · glisser si zoomé · double-clic = focus caméra
+          {layout === 1 ? ' · son activé' : ''}
           {showPagination ? ' · swipe gauche/droite = changer de page' : ''}
         </p>
       )}
@@ -280,6 +281,7 @@ export default function DashboardPage() {
               sublabel={`${cam.store_name} (${cam.store_code})`}
               hidden={!visible}
               soloHighlight={soloFromDblClick && visible}
+              withAudio={layout === 1 && visible}
               onDoubleClick={() => handleCameraDoubleClick(cam.key)}
             />
           );
