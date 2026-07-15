@@ -9,9 +9,15 @@ type Props = {
   title?: string;
   children: ReactNode;
   showSettings?: boolean;
+  mainClassName?: string;
 };
 
-export function DashboardShell({ title = 'RaspNVR Central', children, showSettings = true }: Props) {
+export function DashboardShell({
+  title = 'RaspNVR Central',
+  children,
+  showSettings = true,
+  mainClassName = '',
+}: Props) {
   const router = useRouter();
 
   return (
@@ -36,7 +42,7 @@ export function DashboardShell({ title = 'RaspNVR Central', children, showSettin
           </button>
         </div>
       </header>
-      <main className="container">{children}</main>
+      <main className={`container ${mainClassName}`.trim()}>{children}</main>
     </>
   );
 }

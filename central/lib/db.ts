@@ -386,6 +386,18 @@ export async function updateStore(
   return data as StoreRow | null;
 }
 
+export async function deleteStore(storeId: string) {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from('raspnvr_stores')
+    .delete()
+    .eq('id', storeId)
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
 export type ViewItemRow = {
   id: string;
   view_id: string;

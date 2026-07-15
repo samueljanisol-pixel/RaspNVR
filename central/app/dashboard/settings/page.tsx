@@ -4,10 +4,12 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DashboardShell } from '@/components/DashboardShell';
+import { Modal } from '@/components/Modal';
 import { adminHeaders, getAdminKey } from '@/lib/auth-client';
 import type { CameraFeed, LiveView, StoreRow } from '@/lib/types';
 
 type Tab = 'views' | 'stores';
+type ModalKind = 'view' | 'store' | null;
 
 function moveItem<T>(list: T[], index: number, delta: number): T[] {
   const next = [...list];
@@ -27,8 +29,60 @@ export default function SettingsPage() {
   const [newViewName, setNewViewName] = useState('');
   const [newStoreCode, setNewStoreCode] = useState('');
   const [newStoreName, setNewStoreName] = useState('');
+  const [openModal, setOpenModal] = useState<ModalKind>(null);
+  const [storeToDelete, setStoreToDelete] = useState<StoreRow | null>(null);
+  const [modalError, setModalError] = useState('');
+  const [modalBusy, setModalBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+
+  function openViewModal() {
+    setModalError('');
+    setNewViewName('');
+    setOpenModal('view');
+  }
+
+  function openStoreModal() {
+    setModalError('');
+    setNewStoreCode('');
+    setNewStoreName('');
+    setOpenModal('store');
+  }
+
+  function closeModal() {
+    if (modalBusy) return;
+    setOpenModal(null);
+    setStoreToDelete(null);
+    setModalError('');
+  }
+
+  function askDeleteStore(store: StoreRow) {
+    setModalError('');
+    setStoreToDelete(store);
+  }
+
+  async function confirmDeleteStore() {
+    if (!storeToDelete) return;
+    setModalError('');
+    setError('');
+    setModalBusy(true);
+    try {
+      const res = await fetch(`/api/raspnvr/admin/stores/${storeToDelete.id}`, {
+        method: 'DELETE',
+        headers: adminHeaders(),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setModalError(data.detail || 'Erreur');
+        return;
+      }
+      setMsg(`Magasin « ${storeToDelete.name} » supprimé.`);
+      setStoreToDelete(null);
+      await loadAll();
+    } finally {
+      setModalBusy(false);
+    }
+  }
 
   const loadAll = useCallback(async () => {
     if (!getAdminKey()) {
@@ -86,22 +140,28 @@ export default function SettingsPage() {
 
   async function onAddView(event: FormEvent) {
     event.preventDefault();
-    setMsg('');
+    setModalError('');
     setError('');
-    const res = await fetch('/api/raspnvr/admin/views', {
-      method: 'POST',
-      headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newViewName }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.detail || 'Erreur');
-      return;
+    setModalBusy(true);
+    try {
+      const res = await fetch('/api/raspnvr/admin/views', {
+        method: 'POST',
+        headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newViewName }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setModalError(data.detail || 'Erreur');
+        return;
+      }
+      setNewViewName('');
+      setSelectedViewId(data.view.id);
+      setMsg(`Vue « ${data.view.name} » créée.`);
+      setOpenModal(null);
+      await loadAll();
+    } finally {
+      setModalBusy(false);
     }
-    setNewViewName('');
-    setSelectedViewId(data.view.id);
-    setMsg(`Vue « ${data.view.name} » créée.`);
-    await loadAll();
   }
 
   async function reorderViewsLocal(index: number, delta: number) {
@@ -150,22 +210,28 @@ export default function SettingsPage() {
 
   async function onAddStore(event: FormEvent) {
     event.preventDefault();
-    setMsg('');
+    setModalError('');
     setError('');
-    const res = await fetch('/api/raspnvr/admin/stores', {
-      method: 'POST',
-      headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: newStoreCode, name: newStoreName }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.detail || 'Erreur');
-      return;
+    setModalBusy(true);
+    try {
+      const res = await fetch('/api/raspnvr/admin/stores', {
+        method: 'POST',
+        headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: newStoreCode, name: newStoreName }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setModalError(data.detail || 'Erreur');
+        return;
+      }
+      setNewStoreCode('');
+      setNewStoreName('');
+      setMsg(`Magasin « ${data.store.name} » créé.`);
+      setOpenModal(null);
+      await loadAll();
+    } finally {
+      setModalBusy(false);
     }
-    setNewStoreCode('');
-    setNewStoreName('');
-    setMsg(`Magasin « ${data.store.name} » créé.`);
-    await loadAll();
   }
 
   const keysInView = selectedKeys();
@@ -194,14 +260,12 @@ export default function SettingsPage() {
       {tab === 'views' && (
         <>
           <section className="panel">
-            <h2>Nouvelle vue</h2>
-            <form onSubmit={onAddView} className="store-form inline-form">
-              <label>
-                Nom
-                <input value={newViewName} onChange={(e) => setNewViewName(e.target.value)} placeholder="Entrée magasin" required />
-              </label>
-              <button className="btn" type="submit">Créer</button>
-            </form>
+            <div className="panel-head">
+              <h2>Vues</h2>
+              <button type="button" className="btn" onClick={openViewModal}>
+                Nouvelle vue
+              </button>
+            </div>
           </section>
 
           <section className="panel">
@@ -273,15 +337,12 @@ export default function SettingsPage() {
       {tab === 'stores' && (
         <>
           <section className="panel">
-            <h2>Ajouter un magasin</h2>
-            <form onSubmit={onAddStore} className="store-form">
-              <label>Code<input value={newStoreCode} onChange={(e) => setNewStoreCode(e.target.value)} pattern="[a-z0-9][a-z0-9-]*" required /></label>
-              <label>Nom<input value={newStoreName} onChange={(e) => setNewStoreName(e.target.value)} required /></label>
-              <button className="btn" type="submit">Ajouter</button>
-            </form>
-          </section>
-          <section className="panel">
-            <h2>Magasins</h2>
+            <div className="panel-head">
+              <h2>Magasins</h2>
+              <button type="button" className="btn" onClick={openStoreModal}>
+                Ajouter un magasin
+              </button>
+            </div>
             <div className="grid">
               {stores.map((store) => (
                 <article key={store.id} className="card">
@@ -290,13 +351,100 @@ export default function SettingsPage() {
                     <span className={`badge ${store.online ? 'ok' : 'off'}`}>{store.online ? 'En ligne' : 'Hors ligne'}</span>
                   </div>
                   <p className="meta">Code : {store.code}</p>
-                  <Link href={`/dashboard/stores/${store.id}`}>Gérer le magasin →</Link>
+                  <div className="card-actions">
+                    <Link href={`/dashboard/stores/${store.id}`}>Gérer →</Link>
+                    <button type="button" className="btn danger btn-sm" onClick={() => askDeleteStore(store)}>
+                      Supprimer
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>
           </section>
         </>
       )}
+
+      <Modal open={openModal === 'view'} title="Nouvelle vue" onClose={closeModal}>
+        <form onSubmit={onAddView} className="modal-form">
+          <label>
+            Nom de la vue
+            <input
+              value={newViewName}
+              onChange={(e) => setNewViewName(e.target.value)}
+              placeholder="Entrée magasin"
+              required
+              autoFocus
+            />
+          </label>
+          {modalError && openModal === 'view' && <p className="error">{modalError}</p>}
+          <div className="modal-actions">
+            <button type="button" className="btn secondary" onClick={closeModal} disabled={modalBusy}>
+              Annuler
+            </button>
+            <button type="submit" className="btn" disabled={modalBusy}>
+              {modalBusy ? 'Création…' : 'Créer'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={openModal === 'store'} title="Ajouter un magasin" onClose={closeModal}>
+        <form onSubmit={onAddStore} className="modal-form">
+          <label>
+            Code
+            <input
+              value={newStoreCode}
+              onChange={(e) => setNewStoreCode(e.target.value)}
+              pattern="[a-z0-9][a-z0-9-]*"
+              placeholder="mag01"
+              required
+              autoFocus
+            />
+          </label>
+          <label>
+            Nom
+            <input
+              value={newStoreName}
+              onChange={(e) => setNewStoreName(e.target.value)}
+              placeholder="Magasin centre-ville"
+              required
+            />
+          </label>
+          {modalError && openModal === 'store' && <p className="error">{modalError}</p>}
+          <div className="modal-actions">
+            <button type="button" className="btn secondary" onClick={closeModal} disabled={modalBusy}>
+              Annuler
+            </button>
+            <button type="submit" className="btn" disabled={modalBusy}>
+              {modalBusy ? 'Ajout…' : 'Ajouter'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={Boolean(storeToDelete)}
+        title="Supprimer le magasin"
+        onClose={closeModal}
+      >
+        <div className="modal-form">
+          <p>
+            Supprimer le magasin <strong>{storeToDelete?.name}</strong> ({storeToDelete?.code}) ?
+          </p>
+          <p className="meta">
+            Cette action est irréversible. L&apos;appareil, les tokens et les enregistrements associés seront supprimés.
+          </p>
+          {modalError && storeToDelete && <p className="error">{modalError}</p>}
+          <div className="modal-actions">
+            <button type="button" className="btn secondary" onClick={closeModal} disabled={modalBusy}>
+              Annuler
+            </button>
+            <button type="button" className="btn danger" onClick={confirmDeleteStore} disabled={modalBusy}>
+              {modalBusy ? 'Suppression…' : 'Supprimer'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </DashboardShell>
   );
 }
