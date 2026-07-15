@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="RaspNVR">
+  <rect width="512" height="512" rx="108" fill="#0f172a"/>
+  <path fill="#60a5fa" d="M112 168h76l36-52h80l36 52h76c30.9 0 56 25.1 56 56v152c0 30.9-25.1 56-56 56H112c-30.9 0-56-25.1-56-56V224c0-30.9 25.1-56 56-56z"/>
+  <circle cx="256" cy="296" r="84" fill="#1e293b"/>
+  <circle cx="256" cy="296" r="56" fill="#93c5fd"/>
+  <circle cx="332" cy="224" r="18" fill="#e2e8f0"/>
+</svg>

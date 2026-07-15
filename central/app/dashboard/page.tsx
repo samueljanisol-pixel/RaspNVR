@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { DashboardShell } from '@/components/DashboardShell';
 import { LivePlayer, LivePlayerHandle } from '@/components/LivePlayer';
 import { adminHeaders, getAdminKey } from '@/lib/auth-client';
+import { useLiveFullscreen } from '@/lib/useLiveFullscreen';
 import type { CameraFeed, LiveView } from '@/lib/types';
 
 type LayoutMode = 1 | 4 | 9;
@@ -30,6 +31,7 @@ function resolveViewCameras(view: LiveView, allFeeds: CameraFeed[]): CameraFeed[
 export default function DashboardPage() {
   const router = useRouter();
   const playerRefs = useRef<Map<string, LivePlayerHandle>>(new Map());
+  const stageRef = useRef<HTMLDivElement>(null);
   const [views, setViews] = useState<LiveView[]>([]);
   const [feeds, setFeeds] = useState<CameraFeed[]>([]);
   const [activeViewId, setActiveViewId] = useState<string>('');
@@ -38,6 +40,15 @@ export default function DashboardPage() {
   const [previousLayout, setPreviousLayout] = useState<LayoutMode | null>(null);
   const [soloFromDblClick, setSoloFromDblClick] = useState(false);
   const [error, setError] = useState('');
+
+  function resetAllZooms() {
+    playerRefs.current.forEach((handle) => handle.resetZoom());
+  }
+
+  const { isFullscreen, enterFullscreen, exitFullscreen } = useLiveFullscreen(stageRef, {
+    onEnter: () => resetAllZooms(),
+    onExit: () => resetAllZooms(),
+  });
 
   useEffect(() => {
     setLayout(readLayout());
@@ -95,10 +106,6 @@ export default function DashboardPage() {
 
   const emptySlots = layout === 1 ? 0 : Math.max(0, slots - visibleKeys.length);
 
-  function resetAllZooms() {
-    playerRefs.current.forEach((handle) => handle.resetZoom());
-  }
-
   function persistLayout(next: LayoutMode) {
     localStorage.setItem(LAYOUT_KEY, String(next));
     setLayout(next);
@@ -146,43 +153,59 @@ export default function DashboardPage() {
 
   return (
     <DashboardShell mainClassName="container-live">
-      {error && <p className="error">{error}</p>}
+      {!isFullscreen && error && <p className="error">{error}</p>}
 
-      <nav className="view-tabs" aria-label="Vues live">
-        {views.map((view) => (
-          <button
-            key={view.id}
-            type="button"
-            className={`view-tab ${activeView?.id === view.id ? 'active' : ''}`}
-            onClick={() => handleViewChange(view.id)}
-          >
-            {view.name}
-          </button>
-        ))}
-      </nav>
-
-      <div className="live-toolbar">
-        <p className="meta view-meta">
-          {displayCameras.length} caméra(s)
-          {displayCameras.filter((c) => c.online).length < displayCameras.length &&
-            ` · ${displayCameras.filter((c) => c.online).length} en ligne`}
-        </p>
-        <div className="layout-picker" role="group" aria-label="Disposition des caméras">
-          {([1, 4, 9] as const).map((n) => (
+      {!isFullscreen && (
+        <nav className="view-tabs" aria-label="Vues live">
+          {views.map((view) => (
             <button
-              key={n}
+              key={view.id}
               type="button"
-              className={`layout-btn ${layout === n ? 'active' : ''}`}
-              title={`${n} caméra${n > 1 ? 's' : ''}`}
-              onClick={() => setLayoutMode(n)}
+              className={`view-tab ${activeView?.id === view.id ? 'active' : ''}`}
+              onClick={() => handleViewChange(view.id)}
             >
-              {n}
+              {view.name}
             </button>
           ))}
-        </div>
-      </div>
+        </nav>
+      )}
 
-      {showCameraTabs && (
+      {!isFullscreen && (
+        <div className="live-toolbar">
+          <p className="meta view-meta">
+            {displayCameras.length} caméra(s)
+            {displayCameras.filter((c) => c.online).length < displayCameras.length &&
+              ` · ${displayCameras.filter((c) => c.online).length} en ligne`}
+          </p>
+          <div className="live-toolbar-actions">
+            <div className="layout-picker" role="group" aria-label="Disposition des caméras">
+              {([1, 4, 9] as const).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={`layout-btn ${layout === n ? 'active' : ''}`}
+                  title={`${n} caméra${n > 1 ? 's' : ''}`}
+                  onClick={() => setLayoutMode(n)}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            {displayCameras.length > 0 && (
+              <button
+                type="button"
+                className="btn secondary fullscreen-btn"
+                title="Plein écran (Retour pour quitter)"
+                onClick={() => enterFullscreen().catch(() => {})}
+              >
+                Plein écran
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!isFullscreen && showCameraTabs && (
         <nav className="camera-tabs" aria-label="Caméras">
           {displayCameras.map((cam) => (
             <button
@@ -197,13 +220,19 @@ export default function DashboardPage() {
         </nav>
       )}
 
-      {displayCameras.length > 0 && (
+      {!isFullscreen && displayCameras.length > 0 && (
         <p className="view-hint">
-          Ctrl + molette ou pincement pour zoomer · glisser si zoomé · double-clic = plein écran
+          Ctrl + molette ou pincement pour zoomer · glisser si zoomé · double-clic = focus caméra · Plein écran = caméras seules
         </p>
       )}
 
-      <section className={`live-grid layout-${layout}`}>
+      <div ref={stageRef} className={`live-stage${isFullscreen ? ' is-fullscreen' : ''}`}>
+        {isFullscreen && (
+          <button type="button" className="fullscreen-back-btn" onClick={() => exitFullscreen().catch(() => {})}>
+            ← Retour
+          </button>
+        )}
+        <section className={`live-grid layout-${layout}`}>
         {displayCameras.map((cam) => {
           const src = cam.online
             ? `${cam.tunnel_url}/api/hls/cam${cam.camera_id}/index.m3u8`
@@ -230,9 +259,10 @@ export default function DashboardPage() {
             Aucune caméra
           </div>
         ))}
-      </section>
+        </section>
+      </div>
 
-      {!displayCameras.length && !error && (
+      {!isFullscreen && !displayCameras.length && !error && (
         <p className="meta empty-hint">
           Aucune caméra dans cette vue. Ajoutez-en dans{' '}
           <Link href="/dashboard/settings">Paramètres → Vues</Link>.
