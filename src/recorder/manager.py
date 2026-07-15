@@ -42,20 +42,33 @@ class RecorderManager:
 
     async def _configure_mediamtx(self, camera: dict) -> None:
         path_name = f"cam{camera['id']}"
-        live_url = camera.get("rtsp_main") or camera["rtsp_sub"]
+        live_url = camera.get("rtsp_sub") or camera["rtsp_main"]
+        escaped_url = live_url.replace("'", "'\\''")
+        # HLS ne supporte pas G711 : ffmpeg transcode l'audio en AAC vers MediaMTX.
+        run_on_init = (
+            "ffmpeg -hide_banner -loglevel warning -rtsp_transport tcp "
+            "-fflags nobuffer -flags low_delay -probesize 32 -analyzeduration 0 "
+            f"-i '{escaped_url}' -c:v copy -c:a aac -ar 44100 -ac 1 -b:a 64k "
+            f"-async 1 -f rtsp rtsp://127.0.0.1:8554/{path_name}"
+        )
         payload = {
-            "source": live_url,
-            "sourceProtocol": "tcp",
-            "sourceOnDemand": False,
+            "runOnInit": run_on_init,
+            "runOnInitRestart": True,
         }
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            base = f"{settings.mediamtx_api_url}/v3/config/paths"
+            try:
+                await client.post(f"{base}/delete/{path_name}")
+            except httpx.HTTPError as exc:
+                logger.debug("MediaMTX delete %s: %s", path_name, exc)
             for method, url in (
-                ("post", f"{settings.mediamtx_api_url}/v3/config/paths/add/{path_name}"),
-                ("patch", f"{settings.mediamtx_api_url}/v3/config/paths/patch/{path_name}"),
+                ("post", f"{base}/add/{path_name}"),
+                ("patch", f"{base}/patch/{path_name}"),
             ):
                 try:
                     resp = await client.request(method, url, json=payload)
                     if resp.status_code in (200, 201):
+                        logger.info("MediaMTX %s configuré (AAC)", path_name)
                         return
                 except httpx.HTTPError as exc:
                     logger.warning("MediaMTX API %s: %s", method, exc)

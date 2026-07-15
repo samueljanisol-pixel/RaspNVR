@@ -308,6 +308,29 @@ h2 { font-size: 1rem; margin-top: 0; }
   pointer-events: none;
 }
 
+.card .audio-btn {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0.45rem 0.85rem;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.card .audio-btn:hover {
+  background: rgba(30, 30, 30, 0.9);
+}
+
+.card .audio-btn.hidden {
+  display: none;
+}
+
 video {
   background: #000;
   display: block;

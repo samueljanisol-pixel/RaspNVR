@@ -43,6 +43,20 @@ function getHlsCtor(): HlsCtor | undefined {
   return (window as typeof window & { Hls?: HlsCtor }).Hls;
 }
 
+function hlsConfig(withAudio: boolean) {
+  return {
+    lowLatencyMode: true,
+    enableWorker: true,
+    liveSyncDuration: withAudio ? 1.5 : 1,
+    liveMaxLatencyDuration: withAudio ? 5 : 4,
+    maxLiveSyncPlaybackRate: 1.5,
+    maxBufferLength: 4,
+    maxMaxBufferLength: 6,
+    backBufferLength: 0,
+    liveBackBufferLength: 0,
+  };
+}
+
 export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlayer(
   { src, label, sublabel, hidden, soloHighlight, withAudio = false, onDoubleClick },
   ref,
@@ -52,6 +66,7 @@ export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlaye
   const resetRef = useRef<(() => void) | null>(null);
   const [connState, setConnState] = useState<ConnState>(src ? 'connecting' : 'offline');
   const [retryCount, setRetryCount] = useState(0);
+  const [audioBlocked, setAudioBlocked] = useState(false);
 
   useVideoZoom(wrapRef, resetRef);
 
@@ -64,13 +79,30 @@ export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlaye
     setRetryCount(0);
   }, [src]);
 
+  async function enableAudio() {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = false;
+    video.volume = 1;
+    try {
+      await video.play();
+      setAudioBlocked(false);
+    } catch {
+      setAudioBlocked(true);
+    }
+  }
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    video.muted = !withAudio;
-    if (withAudio && connState === 'playing') {
-      video.play().catch(() => {});
+    if (!withAudio) {
+      video.muted = true;
+      setAudioBlocked(false);
+      return;
     }
+    video.volume = 1;
+    video.muted = false;
+    video.play().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
   }, [withAudio, connState]);
 
   useEffect(() => {
@@ -145,13 +177,7 @@ export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlaye
     const cacheBustSrc = retryCount > 0 ? `${src}${src.includes('?') ? '&' : '?'}r=${retryCount}` : src;
 
     if (HlsCtor?.isSupported()) {
-      hls = new HlsCtor({
-        lowLatencyMode: false,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 10,
-        maxLiveSyncPlaybackRate: 1.2,
-        backBufferLength: 30,
-      });
+      hls = new HlsCtor(hlsConfig(withAudio));
       hls.loadSource(cacheBustSrc);
       hls.attachMedia(video);
       hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
@@ -191,7 +217,7 @@ export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlaye
       video.removeEventListener('error', onVideoError);
       hls?.destroy();
     };
-  }, [src, retryCount]);
+  }, [src, retryCount, withAudio]);
 
   function handleDoubleClick(event: React.MouseEvent) {
     if (event.target instanceof Element && !event.target.closest('.video-wrap')) return;
@@ -230,6 +256,11 @@ export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlaye
           </div>
           {statusLabel && (
             <div className={`live-status live-status-${connState}`}>{statusLabel}</div>
+          )}
+          {withAudio && audioBlocked && connState === 'playing' && (
+            <button type="button" className="live-audio-btn" onClick={() => enableAudio()}>
+              Activer le son
+            </button>
           )}
         </div>
       ) : (

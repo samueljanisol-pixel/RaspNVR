@@ -11,5 +11,9 @@ rtspAddress: :8554
 hls: yes
 hlsAddress: :8888
 hlsAllowOrigin: '*'
+hlsVariant: lowLatency
+hlsSegmentDuration: 500ms
+hlsPartDuration: 100ms
+hlsSegmentCount: 7
 
 paths: {}

@@ -39,22 +39,35 @@ function urlsFromFullRtsp(fullUrl) {
   return { rtsp_main: main, rtsp_sub: sub };
 }
 
-function attachHls(video, url) {
-  if (video.dataset.src === url && video._hls) return;
+function hlsLiveConfig(withAudio = false) {
+  return {
+    lowLatencyMode: true,
+    enableWorker: true,
+    // Segments MediaMTX = 5 s (GOP caméra) ; viser ~1 s du live via les parts LL-HLS.
+    liveSyncDuration: withAudio ? 1.5 : 1,
+    liveMaxLatencyDuration: withAudio ? 5 : 4,
+    maxLiveSyncPlaybackRate: 1.5,
+    maxBufferLength: 4,
+    maxMaxBufferLength: 6,
+    backBufferLength: 0,
+    liveBackBufferLength: 0,
+  };
+}
+
+function attachHls(video, url, { withAudio = false, force = false } = {}) {
+  const audioKey = withAudio ? '1' : '0';
+  if (!force && video.dataset.src === url && video.dataset.audio === audioKey && video._hls) {
+    return;
+  }
   video.dataset.src = url;
+  video.dataset.audio = audioKey;
 
   if (typeof Hls !== 'undefined' && Hls.isSupported()) {
     if (video._hls) {
       video._hls.destroy();
       video._hls = null;
     }
-    const hls = new Hls({
-      lowLatencyMode: false,
-      liveSyncDurationCount: 3,
-      liveMaxLatencyDurationCount: 10,
-      maxLiveSyncPlaybackRate: 1.2,
-      backBufferLength: 30,
-    });
+    const hls = new Hls(hlsLiveConfig(withAudio));
     hls.loadSource(url);
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED, () => {

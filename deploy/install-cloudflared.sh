@@ -19,9 +19,11 @@ case "${ARCH}" in
 esac
 
 echo "==> cloudflared (${CF_ARCH})"
+TMP_CF="$(mktemp)"
 curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}" \
-  -o /usr/local/bin/cloudflared
-chmod +x /usr/local/bin/cloudflared
+  -o "${TMP_CF}"
+install -m 755 "${TMP_CF}" /usr/local/bin/cloudflared
+rm -f "${TMP_CF}"
 
 INSTALL_DIR="/opt/raspnvr"
 cp "${INSTALL_DIR}/deploy/cloudflared.service" /etc/systemd/system/cloudflared.service

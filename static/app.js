@@ -18,14 +18,19 @@ function createCameraCard(cam) {
       <div class="video-zoom">
         <video muted autoplay playsinline disablepictureinpicture></video>
       </div>
+      <button type="button" class="audio-btn hidden">Activer le son</button>
     </div>
   `;
   card.querySelector('.cam-name').textContent = cam.name;
   updateCameraBadge(card, cam);
   const wrap = card.querySelector('.video-wrap');
   initVideoZoom(wrap);
+  card.querySelector('.audio-btn')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    enableCardAudio(card);
+  });
   if (cam.hls_url) {
-    attachHls(card.querySelector('video'), cam.hls_url);
+    attachHls(card.querySelector('video'), cam.hls_url, { withAudio: layout === 1 });
   }
 
   card.addEventListener('dblclick', (event) => {
@@ -90,6 +95,46 @@ function resetAllZooms() {
   });
 }
 
+function syncAudioMute() {
+  const enableAudio = layout === 1;
+  cameraCards.forEach((card) => {
+    const video = card.querySelector('video');
+    if (!video) return;
+    const visible = !card.classList.contains('hidden-slot');
+    const audioOn = enableAudio && visible;
+    const btn = card.querySelector('.audio-btn');
+    const cam = allCameras.find((c) => c.id === Number(card.dataset.cameraId));
+    if (cam?.hls_url && video.dataset.audio !== (audioOn ? '1' : '0')) {
+      attachHls(video, cam.hls_url, { withAudio: audioOn, force: true });
+    }
+    video.muted = !audioOn;
+    if (!audioOn) {
+      btn?.classList.add('hidden');
+      return;
+    }
+    video.volume = 1;
+    btn?.classList.add('hidden');
+    if (cam?.hls_url) {
+      attachHls(video, cam.hls_url, { withAudio: true, force: true });
+    }
+    video
+      .play()
+      .then(() => {
+        if (video.muted) btn?.classList.remove('hidden');
+      })
+      .catch(() => btn?.classList.remove('hidden'));
+  });
+}
+
+function enableCardAudio(card) {
+  const video = card.querySelector('video');
+  if (!video) return;
+  video.muted = false;
+  video.volume = 1;
+  video.play().catch(() => {});
+  card.querySelector('.audio-btn')?.classList.add('hidden');
+}
+
 function setLayout(newLayout) {
   layout = newLayout;
   soloFromDblClick = false;
@@ -121,6 +166,7 @@ function applyLayoutVisibility() {
       card.classList.toggle('hidden-slot', !show);
       card.classList.toggle('solo-highlight', soloFromDblClick && show);
     });
+    syncAudioMute();
     return;
   }
 
@@ -138,6 +184,7 @@ function applyLayoutVisibility() {
     empty.textContent = 'Aucune caméra';
     grid.appendChild(empty);
   }
+  syncAudioMute();
 }
 
 function updateCameraTabs() {
