@@ -1,17 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAdminKey } from '@/lib/auth-client';
+import { useGuestOnly } from '@/lib/useRequireAuth';
 
 export default function LoginPage() {
   const router = useRouter();
+  const ready = useGuestOnly();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (getAdminKey()) router.replace('/dashboard');
-  }, [router]);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -26,6 +23,8 @@ export default function LoginPage() {
     sessionStorage.setItem('raspnvr_admin_key', password);
     router.replace('/dashboard');
   }
+
+  if (!ready) return null;
 
   return (
     <main className="container login-page">

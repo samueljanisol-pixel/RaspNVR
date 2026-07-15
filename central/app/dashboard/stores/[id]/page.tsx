@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { DashboardShell } from '@/components/DashboardShell';
 import { adminHeaders, getAdminKey } from '@/lib/auth-client';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 
 type CameraInfo = { id: number; name: string; hls_url?: string };
 
@@ -37,6 +38,7 @@ function formatBytes(n: number) {
 export default function StoreDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const authed = useRequireAuth();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [token, setToken] = useState('');
   const [msg, setMsg] = useState('');
@@ -46,10 +48,7 @@ export default function StoreDetailPage() {
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
 
   const loadDetail = useCallback(async () => {
-    if (!getAdminKey()) {
-      router.replace('/login');
-      return;
-    }
+    if (!getAdminKey()) return;
     const res = await fetch(`/api/raspnvr/admin/stores/${params.id}`, { headers: adminHeaders() });
     if (res.status === 401) {
       router.replace('/login');
@@ -63,8 +62,9 @@ export default function StoreDetailPage() {
   }, [params.id, router]);
 
   useEffect(() => {
+    if (!authed) return;
     loadDetail().catch((err) => setError(String(err)));
-  }, [loadDetail]);
+  }, [authed, loadDetail]);
 
   useEffect(() => {
     if (!detail?.device?.tunnel_url) return;
@@ -146,6 +146,8 @@ export default function StoreDetailPage() {
     }
     window.open(data.url, '_blank');
   }
+
+  if (!authed) return null;
 
   if (!detail) {
     return (

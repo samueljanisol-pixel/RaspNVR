@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 import { DashboardShell } from '@/components/DashboardShell';
 import { LivePlayer, LivePlayerHandle } from '@/components/LivePlayer';
 import { adminHeaders, getAdminKey } from '@/lib/auth-client';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useLiveFullscreen } from '@/lib/useLiveFullscreen';
+import { useSwipePages } from '@/lib/useSwipePages';
 import type { CameraFeed, LiveView } from '@/lib/types';
 
 type LayoutMode = 1 | 4 | 9;
@@ -30,6 +32,7 @@ function resolveViewCameras(view: LiveView, allFeeds: CameraFeed[]): CameraFeed[
 
 export default function DashboardPage() {
   const router = useRouter();
+  const authed = useRequireAuth();
   const playerRefs = useRef<Map<string, LivePlayerHandle>>(new Map());
   const stageRef = useRef<HTMLDivElement>(null);
   const [views, setViews] = useState<LiveView[]>([]);
@@ -39,6 +42,7 @@ export default function DashboardPage() {
   const [focusedKey, setFocusedKey] = useState('');
   const [previousLayout, setPreviousLayout] = useState<LayoutMode | null>(null);
   const [soloFromDblClick, setSoloFromDblClick] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
   const [error, setError] = useState('');
 
   function resetAllZooms() {
@@ -56,10 +60,7 @@ export default function DashboardPage() {
   }, []);
 
   const loadData = useCallback(async () => {
-    if (!getAdminKey()) {
-      router.replace('/login');
-      return;
-    }
+    if (!getAdminKey()) return;
     const [viewsRes, camsRes] = await Promise.all([
       fetch('/api/raspnvr/admin/views', { headers: adminHeaders() }),
       fetch('/api/raspnvr/admin/cameras', { headers: adminHeaders() }),
@@ -78,12 +79,13 @@ export default function DashboardPage() {
   }, [router]);
 
   useEffect(() => {
+    if (!authed) return;
     loadData().catch((err) => setError(String(err)));
     const timer = setInterval(() => {
       loadData().catch(() => {});
     }, 30000);
     return () => clearInterval(timer);
-  }, [loadData]);
+  }, [authed, loadData]);
 
   const activeView = views.find((v) => v.id === activeViewId) || views[0];
   const displayCameras = useMemo(
@@ -99,12 +101,53 @@ export default function DashboardPage() {
 
   const slots = layout === 1 ? 1 : layout === 4 ? 4 : 9;
 
-  const visibleKeys = useMemo(() => {
-    if (layout === 1) return effectiveFocusKey ? [effectiveFocusKey] : [];
-    return displayCameras.slice(0, slots).map((c) => c.key);
-  }, [layout, displayCameras, effectiveFocusKey, slots]);
+  const pageCount = useMemo(() => {
+    if (layout === 1 && soloFromDblClick) return 1;
+    return Math.max(1, Math.ceil(displayCameras.length / slots));
+  }, [layout, soloFromDblClick, displayCameras.length, slots]);
 
-  const emptySlots = layout === 1 ? 0 : Math.max(0, slots - visibleKeys.length);
+  const safePageIndex = Math.min(pageIndex, pageCount - 1);
+
+  const pageCameras = useMemo(() => {
+    if (layout === 1 && soloFromDblClick) {
+      const cam = displayCameras.find((c) => c.key === effectiveFocusKey);
+      return cam ? [cam] : [];
+    }
+    const start = safePageIndex * slots;
+    return displayCameras.slice(start, start + slots);
+  }, [layout, soloFromDblClick, displayCameras, effectiveFocusKey, safePageIndex, slots]);
+
+  const visibleKeys = useMemo(() => pageCameras.map((c) => c.key), [pageCameras]);
+  const emptySlots = layout === 1 ? 0 : Math.max(0, slots - pageCameras.length);
+  const showPagination = pageCount > 1;
+
+  const pageCountRef = useRef(pageCount);
+  pageCountRef.current = pageCount;
+
+  useEffect(() => {
+    setPageIndex((current) => Math.min(current, pageCount - 1));
+  }, [pageCount]);
+
+  const goToPage = useCallback((index: number) => {
+    setPageIndex(Math.max(0, Math.min(index, pageCountRef.current - 1)));
+    resetAllZooms();
+  }, []);
+
+  const goPrevPage = useCallback(() => {
+    setPageIndex((current) => Math.max(0, current - 1));
+    resetAllZooms();
+  }, []);
+
+  const goNextPage = useCallback(() => {
+    setPageIndex((current) => Math.min(pageCountRef.current - 1, current + 1));
+    resetAllZooms();
+  }, []);
+
+  useSwipePages(stageRef, {
+    enabled: showPagination,
+    onPrev: goPrevPage,
+    onNext: goNextPage,
+  });
 
   function persistLayout(next: LayoutMode) {
     localStorage.setItem(LAYOUT_KEY, String(next));
@@ -120,6 +163,7 @@ export default function DashboardPage() {
     persistLayout(next);
     setSoloFromDblClick(false);
     setPreviousLayout(null);
+    setPageIndex(0);
     resetAllZooms();
   }
 
@@ -145,11 +189,11 @@ export default function DashboardPage() {
     setActiveViewId(viewId);
     setSoloFromDblClick(false);
     setPreviousLayout(null);
+    setPageIndex(0);
     resetAllZooms();
   }
 
-  const showCameraTabs =
-    layout === 1 && displayCameras.length > 1 && !soloFromDblClick;
+  if (!authed) return null;
 
   return (
     <DashboardShell mainClassName="container-live">
@@ -205,24 +249,10 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {!isFullscreen && showCameraTabs && (
-        <nav className="camera-tabs" aria-label="Caméras">
-          {displayCameras.map((cam) => (
-            <button
-              key={cam.key}
-              type="button"
-              className={`tab-btn ${cam.key === effectiveFocusKey ? 'active' : ''}`}
-              onClick={() => persistFocus(cam.key)}
-            >
-              {cam.camera_name}
-            </button>
-          ))}
-        </nav>
-      )}
-
       {!isFullscreen && displayCameras.length > 0 && (
         <p className="view-hint">
-          Ctrl + molette ou pincement pour zoomer · glisser si zoomé · double-clic = focus caméra · Plein écran = caméras seules
+          Ctrl + molette ou pincement pour zoomer · glisser si zoomé · double-clic = focus caméra
+          {showPagination ? ' · swipe gauche/droite = changer de page' : ''}
         </p>
       )}
 
@@ -234,8 +264,8 @@ export default function DashboardPage() {
         )}
         <section className={`live-grid layout-${layout}`}>
         {displayCameras.map((cam) => {
-          const src = cam.online
-            ? `${cam.tunnel_url}/api/hls/cam${cam.camera_id}/index.m3u8`
+          const src = cam.tunnel_url
+            ? `${cam.tunnel_url.replace(/\/$/, '')}/api/hls/cam${cam.camera_id}/index.m3u8`
             : '';
           const visible = visibleKeys.includes(cam.key);
           return (
@@ -260,6 +290,24 @@ export default function DashboardPage() {
           </div>
         ))}
         </section>
+
+        {showPagination && (
+          <nav
+            className={`page-tabs${isFullscreen ? ' page-tabs-overlay' : ''}`}
+            aria-label="Pages caméras"
+          >
+            {Array.from({ length: pageCount }, (_, index) => (
+              <button
+                key={index}
+                type="button"
+                className={`page-tab ${safePageIndex === index ? 'active' : ''}`}
+                onClick={() => goToPage(index)}
+              >
+                Page {index + 1}
+              </button>
+            ))}
+          </nav>
+        )}
       </div>
 
       {!isFullscreen && !displayCameras.length && !error && (

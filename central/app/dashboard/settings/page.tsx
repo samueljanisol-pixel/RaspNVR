@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { DashboardShell } from '@/components/DashboardShell';
 import { Modal } from '@/components/Modal';
 import { adminHeaders, getAdminKey } from '@/lib/auth-client';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import type { CameraFeed, LiveView, StoreRow } from '@/lib/types';
 
 type Tab = 'views' | 'stores';
@@ -21,6 +22,7 @@ function moveItem<T>(list: T[], index: number, delta: number): T[] {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const authed = useRequireAuth();
   const [tab, setTab] = useState<Tab>('views');
   const [views, setViews] = useState<LiveView[]>([]);
   const [feeds, setFeeds] = useState<CameraFeed[]>([]);
@@ -85,10 +87,7 @@ export default function SettingsPage() {
   }
 
   const loadAll = useCallback(async () => {
-    if (!getAdminKey()) {
-      router.replace('/login');
-      return;
-    }
+    if (!getAdminKey()) return;
     const [viewsRes, camsRes, storesRes] = await Promise.all([
       fetch('/api/raspnvr/admin/views', { headers: adminHeaders() }),
       fetch('/api/raspnvr/admin/cameras', { headers: adminHeaders() }),
@@ -111,8 +110,9 @@ export default function SettingsPage() {
   }, [router]);
 
   useEffect(() => {
+    if (!authed) return;
     loadAll().catch((err) => setError(String(err)));
-  }, [loadAll]);
+  }, [authed, loadAll]);
 
   const selectedView = views.find((v) => v.id === selectedViewId);
 
@@ -238,6 +238,8 @@ export default function SettingsPage() {
   const orderedKeys = selectedView
     ? [...selectedView.items].sort((a, b) => a.sort_order - b.sort_order).map((i) => `${i.store_id}:${i.camera_id}`)
     : [];
+
+  if (!authed) return null;
 
   return (
     <DashboardShell title="Paramètres">
