@@ -112,15 +112,16 @@ export async function getDeviceByApiKey(apiKey: string): Promise<(DeviceRow & { 
 
 export async function updateDeviceHeartbeat(deviceId: string, payload: Record<string, unknown>) {
   const sb = getSupabaseAdmin();
-  const { error } = await sb
-    .from('raspnvr_devices')
-    .update({
-      last_seen_at: nowIso(),
-      last_status: payload,
-      hostname: (payload.hostname as string) || null,
-      agent_version: (payload.agent_version as string) || null,
-    })
-    .eq('id', deviceId);
+  const tunnelUrl =
+    typeof payload.tunnel_url === 'string' ? payload.tunnel_url.trim().replace(/\/$/, '') : '';
+  const update: Record<string, unknown> = {
+    last_seen_at: nowIso(),
+    last_status: payload,
+    hostname: (payload.hostname as string) || null,
+    agent_version: (payload.agent_version as string) || null,
+  };
+  if (tunnelUrl) update.tunnel_url = tunnelUrl;
+  const { error } = await sb.from('raspnvr_devices').update(update).eq('id', deviceId);
   if (error) throw error;
 }
 

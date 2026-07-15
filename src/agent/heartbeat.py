@@ -38,6 +38,9 @@ async def build_heartbeat_payload() -> dict[str, Any]:
         await db.close()
 
     agent_cfg = public_config()
+    from src.agent.tunnel import read_tunnel_url
+
+    tunnel_url = read_tunnel_url() or agent_cfg.get("tunnel_url")
     return {
         "store_code": get_store_code(),
         "device_id": agent_cfg.get("device_id"),
@@ -50,6 +53,6 @@ async def build_heartbeat_payload() -> dict[str, Any]:
         "disk_total_gb": round(usage.total / (1024**3), 2),
         "disk_used_gb": round(usage.used / (1024**3), 2),
         "disk_used_percent": round(100 * usage.used / usage.total, 1),
-        "tunnel_url": agent_cfg.get("tunnel_url"),
+        "tunnel_url": tunnel_url,
         "agent_meta": load_agent_data().get("agent_meta") or {},
     }

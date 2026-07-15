@@ -5,10 +5,14 @@ set -euo pipefail
 TUNNEL_FILE="/opt/raspnvr/data/tunnel_url"
 SERVICE="${1:-cloudflared-quick}"
 
-for _ in $(seq 1 45); do
-  URL="$(journalctl -u "${SERVICE}" -n 80 --no-pager 2>/dev/null \
+read_latest_url() {
+  journalctl -u "${SERVICE}" -b --no-pager -o cat 2>/dev/null \
     | grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' \
-    | tail -1 || true)"
+    | tail -1 || true
+}
+
+for _ in $(seq 1 45); do
+  URL="$(read_latest_url)"
   if [[ -n "${URL}" ]]; then
     CURRENT=""
     [[ -f "${TUNNEL_FILE}" ]] && CURRENT="$(tr -d '\r\n' < "${TUNNEL_FILE}")"

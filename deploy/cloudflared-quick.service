@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 User=pi
 ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080
+ExecStartPost=/bin/bash -c 'sleep 12 && /opt/raspnvr/deploy/sync-tunnel-url.sh cloudflared-quick || true'
 Restart=on-failure
 RestartSec=15
 StandardOutput=journal
