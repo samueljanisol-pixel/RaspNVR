@@ -1,148 +1,114 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { DashboardShell } from '@/components/DashboardShell';
+import { LivePlayer } from '@/components/LivePlayer';
+import { adminHeaders, getAdminKey } from '@/lib/auth-client';
+import type { CameraFeed, LiveView } from '@/lib/types';
 
-type StoreRow = {
-  id: string;
-  code: string;
-  name: string;
-  online: boolean;
-  device?: {
-    hostname?: string;
-    tunnel_url?: string;
-    last_seen_at?: string;
-    last_status?: {
-      camera_count?: number;
-      disk_used_percent?: number;
-    };
-  } | null;
-};
-
-function adminHeaders(): HeadersInit {
-  const key = sessionStorage.getItem('raspnvr_admin_key') || '';
-  return { Authorization: `Bearer ${key}` };
+function resolveViewCameras(view: LiveView, allFeeds: CameraFeed[]): CameraFeed[] {
+  if (view.is_all) {
+    return allFeeds;
+  }
+  const byKey = new Map(allFeeds.map((f) => [f.key, f]));
+  return [...view.items]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((item) => byKey.get(`${item.store_id}:${item.camera_id}`))
+    .filter((f): f is CameraFeed => Boolean(f));
 }
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [stores, setStores] = useState<StoreRow[]>([]);
+  const [views, setViews] = useState<LiveView[]>([]);
+  const [feeds, setFeeds] = useState<CameraFeed[]>([]);
+  const [activeViewId, setActiveViewId] = useState<string>('');
   const [error, setError] = useState('');
-  const [msg, setMsg] = useState('');
-  const [newCode, setNewCode] = useState('');
-  const [newName, setNewName] = useState('');
 
-  const loadStores = useCallback(async () => {
-    const key = sessionStorage.getItem('raspnvr_admin_key');
-    if (!key) {
+  const loadData = useCallback(async () => {
+    if (!getAdminKey()) {
       router.replace('/login');
       return;
     }
-    const res = await fetch('/api/raspnvr/admin/stores', { headers: adminHeaders() });
-    if (res.status === 401) {
+    const [viewsRes, camsRes] = await Promise.all([
+      fetch('/api/raspnvr/admin/views', { headers: adminHeaders() }),
+      fetch('/api/raspnvr/admin/cameras', { headers: adminHeaders() }),
+    ]);
+    if (viewsRes.status === 401 || camsRes.status === 401) {
       router.replace('/login');
       return;
     }
-    if (!res.ok) throw new Error('Chargement impossible');
-    const data = await res.json();
-    setStores(data.stores || []);
+    if (!viewsRes.ok || !camsRes.ok) throw new Error('Chargement impossible');
+    const viewsData = await viewsRes.json();
+    const camsData = await camsRes.json();
+    const nextViews = viewsData.views || [];
+    setViews(nextViews);
+    setFeeds(camsData.cameras || []);
+    setActiveViewId((current) => current || nextViews[0]?.id || '');
   }, [router]);
 
   useEffect(() => {
-    loadStores().catch((err) => setError(String(err)));
-  }, [loadStores]);
+    loadData().catch((err) => setError(String(err)));
+    const timer = setInterval(() => {
+      loadData().catch(() => {});
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [loadData]);
 
-  async function onAddStore(event: FormEvent) {
-    event.preventDefault();
-    setError('');
-    setMsg('');
-    const res = await fetch('/api/raspnvr/admin/stores', {
-      method: 'POST',
-      headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: newCode, name: newName }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.detail || 'Erreur lors de la création');
-      return;
-    }
-    setNewCode('');
-    setNewName('');
-    setMsg(`Magasin « ${data.store.name} » créé.`);
-    await loadStores();
-  }
+  const activeView = views.find((v) => v.id === activeViewId) || views[0];
+  const displayCameras = useMemo(
+    () => (activeView ? resolveViewCameras(activeView, feeds) : []),
+    [activeView, feeds],
+  );
 
   return (
-    <>
-      <header className="topbar">
-        <h1>RaspNVR Central</h1>
-        <button
-          className="btn secondary"
-          type="button"
-          onClick={() => {
-            sessionStorage.removeItem('raspnvr_admin_key');
-            router.push('/login');
-          }}
-        >
-          Déconnexion
-        </button>
-      </header>
-      <main className="container">
-        <section className="panel">
-          <h2>Ajouter un magasin</h2>
-          <form onSubmit={onAddStore} className="store-form">
-            <label>
-              Code
-              <input
-                value={newCode}
-                onChange={(e) => setNewCode(e.target.value)}
-                placeholder="mag02"
-                pattern="[a-z0-9][a-z0-9-]*"
-                required
-              />
-            </label>
-            <label>
-              Nom
-              <input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Magasin Centre"
-                required
-              />
-            </label>
-            <button className="btn" type="submit">Ajouter</button>
-          </form>
-          {msg && <p className="success">{msg}</p>}
-        </section>
+    <DashboardShell>
+      {error && <p className="error">{error}</p>}
 
-        <h2>Magasins</h2>
-        {error && <p className="error">{error}</p>}
-        <div className="grid">
-          {stores.map((store) => (
-            <article key={store.id} className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <strong>{store.name}</strong>
-                <span className={`badge ${store.online ? 'ok' : 'off'}`}>
-                  {store.online ? 'En ligne' : 'Hors ligne'}
-                </span>
-              </div>
-              <p className="meta">Code : {store.code}</p>
-              {store.device?.hostname && <p className="meta">Hostname : {store.device.hostname}</p>}
-              {store.device?.last_status && (
-                <p className="meta">
-                  {store.device.last_status.camera_count ?? 0} caméra(s) · disque{' '}
-                  {store.device.last_status.disk_used_percent ?? '—'}%
-                </p>
-              )}
-              <p style={{ marginTop: '0.75rem' }}>
-                <Link href={`/dashboard/stores/${store.id}`}>Voir le détail →</Link>
-              </p>
-            </article>
-          ))}
-        </div>
-        {!stores.length && !error && <p className="meta">Aucun magasin configuré.</p>}
-      </main>
-    </>
+      <nav className="view-tabs" aria-label="Vues live">
+        {views.map((view) => (
+          <button
+            key={view.id}
+            type="button"
+            className={`view-tab ${activeView?.id === view.id ? 'active' : ''}`}
+            onClick={() => setActiveViewId(view.id)}
+          >
+            {view.name}
+          </button>
+        ))}
+      </nav>
+
+      {activeView && (
+        <p className="meta view-meta">
+          {displayCameras.length} caméra(s)
+          {displayCameras.filter((c) => c.online).length < displayCameras.length &&
+            ` · ${displayCameras.filter((c) => c.online).length} en ligne`}
+        </p>
+      )}
+
+      <section className="video-grid">
+        {displayCameras.map((cam) => {
+          const src = cam.online
+            ? `${cam.tunnel_url}/api/hls/cam${cam.camera_id}/index.m3u8`
+            : '';
+          return (
+            <LivePlayer
+              key={cam.key}
+              src={src}
+              label={cam.camera_name}
+              sublabel={`${cam.store_name} (${cam.store_code})`}
+            />
+          );
+        })}
+      </section>
+
+      {!displayCameras.length && !error && (
+        <p className="meta empty-hint">
+          Aucune caméra dans cette vue. Ajoutez-en dans{' '}
+          <Link href="/dashboard/settings">Paramètres → Vues</Link>.
+        </p>
+      )}
+    </DashboardShell>
   );
 }

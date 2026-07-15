@@ -1,39 +1,43 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getAdminKey } from '@/lib/auth-client';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [key, setKey] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (getAdminKey()) router.replace('/dashboard');
+  }, [router]);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError('');
     const res = await fetch('/api/raspnvr/admin/stores', {
-      headers: { Authorization: `Bearer ${key}` },
+      headers: { Authorization: `Bearer ${password}` },
     });
     if (!res.ok) {
-      setError('Clé admin invalide');
+      setError('Mot de passe invalide');
       return;
     }
-    sessionStorage.setItem('raspnvr_admin_key', key);
-    router.push('/dashboard');
+    sessionStorage.setItem('raspnvr_admin_key', password);
+    router.replace('/dashboard');
   }
 
   return (
-    <main className="container" style={{ maxWidth: 420, marginTop: '4rem' }}>
+    <main className="container login-page">
       <div className="panel">
-        <h2>Connexion admin</h2>
-        <p className="meta">Clé API admin (RASPNVR_ADMIN_KEY)</p>
+        <h2>Connexion</h2>
         <form onSubmit={onSubmit}>
           <label>
-            Clé admin
+            Mot de passe
             <input
               type="password"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
               autoFocus
             />

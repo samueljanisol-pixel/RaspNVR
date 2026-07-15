@@ -1,8 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { DashboardShell } from '@/components/DashboardShell';
+import { adminHeaders, getAdminKey } from '@/lib/auth-client';
 
 type CameraInfo = { id: number; name: string; hls_url?: string };
 
@@ -27,11 +29,6 @@ type Detail = {
   }>;
 };
 
-function adminHeaders(): HeadersInit {
-  const key = sessionStorage.getItem('raspnvr_admin_key') || '';
-  return { Authorization: `Bearer ${key}` };
-}
-
 function formatBytes(n: number) {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} Ko`;
   return `${(n / (1024 * 1024)).toFixed(1)} Mo`;
@@ -49,8 +46,7 @@ export default function StoreDetailPage() {
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
 
   const loadDetail = useCallback(async () => {
-    const key = sessionStorage.getItem('raspnvr_admin_key');
-    if (!key) {
+    if (!getAdminKey()) {
       router.replace('/login');
       return;
     }
@@ -152,19 +148,21 @@ export default function StoreDetailPage() {
   }
 
   if (!detail) {
-    return <main className="container"><p className="meta">Chargement…</p></main>;
+    return (
+      <DashboardShell title="Magasin">
+        <p className="meta">Chargement…</p>
+      </DashboardShell>
+    );
   }
 
   const cameras = detail.device?.last_status?.cameras || [];
   const tunnel = detail.device?.tunnel_url;
 
   return (
-    <>
-      <header className="topbar">
-        <h1>{detail.store.name}</h1>
-        <Link href="/dashboard">← Magasins</Link>
-      </header>
-      <main className="container">
+    <DashboardShell title={detail.store.name}>
+      <p className="meta">
+        <Link href="/dashboard/settings">← Paramètres</Link>
+      </p>
         <section className="panel">
           <h3>Informations magasin</h3>
           <form onSubmit={saveStore} className="store-form">
@@ -252,7 +250,6 @@ export default function StoreDetailPage() {
             ))}
           </ul>
         </section>
-      </main>
-    </>
+    </DashboardShell>
   );
 }

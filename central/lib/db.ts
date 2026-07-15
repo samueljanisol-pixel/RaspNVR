@@ -386,4 +386,167 @@ export async function updateStore(
   return data as StoreRow | null;
 }
 
+export type ViewItemRow = {
+  id: string;
+  view_id: string;
+  store_id: string;
+  camera_id: number;
+  sort_order: number;
+};
+
+export type ViewRow = {
+  id: string;
+  name: string;
+  sort_order: number;
+  is_all: boolean;
+  items?: ViewItemRow[];
+};
+
+export async function ensureDefaultViews() {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb.from('raspnvr_views').select('id').eq('is_all', true).limit(1);
+  if (error) throw error;
+  if (data?.length) return;
+  const { error: insErr } = await sb.from('raspnvr_views').insert({ name: 'Toutes', sort_order: 0, is_all: true });
+  if (insErr) throw insErr;
+}
+
+export async function listViews(): Promise<ViewRow[]> {
+  await ensureDefaultViews();
+  const sb = getSupabaseAdmin();
+  const { data: views, error } = await sb
+    .from('raspnvr_views')
+    .select('*')
+    .order('sort_order')
+    .order('name');
+  if (error) throw error;
+
+  const { data: items, error: itemsErr } = await sb
+    .from('raspnvr_view_items')
+    .select('*')
+    .order('sort_order');
+  if (itemsErr) throw itemsErr;
+
+  const byView = new Map<string, ViewItemRow[]>();
+  for (const item of items || []) {
+    const list = byView.get(item.view_id) || [];
+    list.push(item as ViewItemRow);
+    byView.set(item.view_id, list);
+  }
+
+  return (views || []).map((v) => ({
+    ...(v as ViewRow),
+    items: byView.get(v.id) || [],
+  }));
+}
+
+export async function createView(name: string) {
+  const sb = getSupabaseAdmin();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Nom de vue requis');
+  const { data: maxRow } = await sb
+    .from('raspnvr_views')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const sortOrder = ((maxRow?.sort_order as number) || 0) + 1;
+  const { data, error } = await sb
+    .from('raspnvr_views')
+    .insert({ name: trimmed, sort_order: sortOrder, is_all: false })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return { ...(data as ViewRow), items: [] };
+}
+
+export async function updateViewName(viewId: string, name: string) {
+  const sb = getSupabaseAdmin();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Nom de vue requis');
+  const { data: view } = await sb.from('raspnvr_views').select('is_all').eq('id', viewId).maybeSingle();
+  if (!view) return null;
+  const { data, error } = await sb
+    .from('raspnvr_views')
+    .update({ name: view.is_all ? 'Toutes' : trimmed })
+    .eq('id', viewId)
+    .select('*')
+    .maybeSingle();
+  if (error) throw error;
+  return data as ViewRow | null;
+}
+
+export async function deleteView(viewId: string) {
+  const sb = getSupabaseAdmin();
+  const { data: view } = await sb.from('raspnvr_views').select('is_all').eq('id', viewId).maybeSingle();
+  if (!view) return false;
+  if (view.is_all) throw new Error('La vue « Toutes » ne peut pas être supprimée');
+  const { error } = await sb.from('raspnvr_views').delete().eq('id', viewId);
+  if (error) throw error;
+  return true;
+}
+
+export async function reorderViews(viewIds: string[]) {
+  const sb = getSupabaseAdmin();
+  for (let i = 0; i < viewIds.length; i++) {
+    const { error } = await sb.from('raspnvr_views').update({ sort_order: i }).eq('id', viewIds[i]);
+    if (error) throw error;
+  }
+}
+
+export async function setViewItems(
+  viewId: string,
+  items: Array<{ store_id: string; camera_id: number }>,
+) {
+  const sb = getSupabaseAdmin();
+  const { data: view } = await sb.from('raspnvr_views').select('is_all').eq('id', viewId).maybeSingle();
+  if (!view) throw new Error('Vue introuvable');
+  if (view.is_all) throw new Error('La vue « Toutes » est automatique');
+
+  await sb.from('raspnvr_view_items').delete().eq('view_id', viewId);
+  if (items.length) {
+    const rows = items.map((item, index) => ({
+      view_id: viewId,
+      store_id: item.store_id,
+      camera_id: item.camera_id,
+      sort_order: index,
+    }));
+    const { error } = await sb.from('raspnvr_view_items').insert(rows);
+    if (error) throw error;
+  }
+}
+
+export async function listAllCameraFeeds() {
+  const stores = await listStoresWithDevices();
+  const feeds: Array<{
+    key: string;
+    store_id: string;
+    store_code: string;
+    store_name: string;
+    camera_id: number;
+    camera_name: string;
+    tunnel_url: string;
+    online: boolean;
+  }> = [];
+
+  for (const store of stores) {
+    const tunnel = (store.device?.tunnel_url || '').replace(/\/$/, '');
+    const cameras = store.device?.last_status?.cameras || [];
+    if (!Array.isArray(cameras)) continue;
+    for (const cam of cameras as Array<{ id: number; name: string }>) {
+      feeds.push({
+        key: `${store.id}:${cam.id}`,
+        store_id: store.id,
+        store_code: store.code,
+        store_name: store.name,
+        camera_id: cam.id,
+        camera_name: cam.name,
+        tunnel_url: tunnel,
+        online: Boolean(store.online && tunnel),
+      });
+    }
+  }
+  return feeds;
+}
+
 export { generateToken };

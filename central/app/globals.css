@@ -86,3 +86,104 @@ video { width: 100%; background: #000; border-radius: 6px; }
   max-width: 420px;
   margin-bottom: 0.5rem;
 }
+.store-form.inline-form {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  max-width: 520px;
+}
+
+.topbar-actions { display: flex; gap: 0.5rem; align-items: center; }
+.topbar-link { display: inline-flex; align-items: center; text-decoration: none; }
+
+.login-page { max-width: 420px; margin-top: 4rem; }
+
+.view-tabs, .settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.view-tab {
+  background: #334155;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+.view-tab.active {
+  background: var(--accent);
+  color: #0f172a;
+  border-color: var(--accent);
+}
+.view-meta { margin: 0 0 1rem; }
+.empty-hint { margin-top: 1rem; }
+
+.live-card {
+  background: #111827;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.live-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.live-offline {
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  background: #000;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.sort-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sort-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.sort-actions { display: flex; gap: 0.35rem; flex-shrink: 0; }
+.btn-sm { padding: 0.25rem 0.55rem; font-size: 0.85rem; }
+
+.check-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+.check-list label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  color: var(--text);
+  cursor: pointer;
+}
+.check-list input { width: auto; }
+
+.sub-heading {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
