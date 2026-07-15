@@ -117,7 +117,6 @@ export default function DashboardPage() {
     return displayCameras.slice(start, start + slots);
   }, [layout, soloFromDblClick, displayCameras, effectiveFocusKey, safePageIndex, slots]);
 
-  const visibleKeys = useMemo(() => pageCameras.map((c) => c.key), [pageCameras]);
   const emptySlots = layout === 1 ? 0 : Math.max(0, slots - pageCameras.length);
   const showPagination = pageCount > 1;
 
@@ -264,11 +263,10 @@ export default function DashboardPage() {
           </button>
         )}
         <section className={`live-grid layout-${layout}`}>
-        {displayCameras.map((cam) => {
+        {pageCameras.map((cam) => {
           const src = cam.tunnel_url
             ? `${cam.tunnel_url.replace(/\/$/, '')}/api/hls/cam${cam.camera_id}/index.m3u8`
             : '';
-          const visible = visibleKeys.includes(cam.key);
           return (
             <LivePlayer
               key={cam.key}
@@ -279,9 +277,8 @@ export default function DashboardPage() {
               src={src}
               label={cam.camera_name}
               sublabel={`${cam.store_name} (${cam.store_code})`}
-              hidden={!visible}
-              soloHighlight={soloFromDblClick && visible}
-              withAudio={layout === 1 && visible}
+              soloHighlight={soloFromDblClick && layout === 1}
+              withAudio={layout === 1}
               onDoubleClick={() => handleCameraDoubleClick(cam.key)}
             />
           );

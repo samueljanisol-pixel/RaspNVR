@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { isZoomed, useVideoZoom } from '@/lib/useVideoZoom';
+import { hlsLiveConfig } from '@/lib/hlsLiveConfig';
 
 export type LivePlayerHandle = {
   resetZoom: () => void;
@@ -20,8 +21,9 @@ type Props = {
   onDoubleClick?: () => void;
 };
 
-const CONNECT_TIMEOUT_MS = 10_000;
-const RETRY_INTERVAL_MS = 15_000;
+const CONNECT_TIMEOUT_MS = 25_000;
+const RETRY_INTERVAL_MS = 5_000;
+const MAX_RECOVERY_ATTEMPTS = 4;
 
 type HlsInstance = {
   loadSource: (s: string) => void;
@@ -41,20 +43,6 @@ type HlsCtor = {
 
 function getHlsCtor(): HlsCtor | undefined {
   return (window as typeof window & { Hls?: HlsCtor }).Hls;
-}
-
-function hlsConfig(withAudio: boolean) {
-  return {
-    lowLatencyMode: true,
-    enableWorker: true,
-    liveSyncDuration: withAudio ? 1.5 : 1,
-    liveMaxLatencyDuration: withAudio ? 5 : 4,
-    maxLiveSyncPlaybackRate: 1.5,
-    maxBufferLength: 4,
-    maxMaxBufferLength: 6,
-    backBufferLength: 0,
-    liveBackBufferLength: 0,
-  };
 }
 
 export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlayer(
@@ -116,7 +104,8 @@ export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlaye
     let hls: HlsInstance | null = null;
     let connectTimer: ReturnType<typeof setTimeout> | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let mediaRecoveryFailed = false;
+    let recoveryAttempts = 0;
+    let hasPlayed = false;
 
     const clearConnectTimer = () => {
       if (connectTimer) {
@@ -135,6 +124,8 @@ export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlaye
     const markPlaying = () => {
       if (destroyed) return;
       clearConnectTimer();
+      hasPlayed = true;
+      recoveryAttempts = 0;
       setConnState('playing');
     };
 
@@ -149,35 +140,43 @@ export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlaye
       scheduleRetry();
     };
 
+    const recoverStream = () => {
+      if (destroyed || !hls) return false;
+      recoveryAttempts += 1;
+      if (recoveryAttempts > MAX_RECOVERY_ATTEMPTS) return false;
+      hls.startLoad();
+      return true;
+    };
+
     const startConnectTimeout = () => {
       clearConnectTimer();
       connectTimer = setTimeout(markOffline, CONNECT_TIMEOUT_MS);
     };
 
     const keepPlaying = () => {
+      if (!hasPlayed) return;
       if (video.paused && !video.ended) video.play().catch(() => {});
     };
 
     const onVideoPlaying = () => markPlaying();
-    const onVideoCanPlay = () => markPlaying();
-    const onVideoError = () => {
-      if (!mediaRecoveryFailed) markOffline();
+    const onVideoCanPlay = () => {
+      if (!hasPlayed) markPlaying();
     };
 
     video.addEventListener('pause', keepPlaying);
     video.addEventListener('playing', onVideoPlaying);
     video.addEventListener('canplay', onVideoCanPlay);
-    video.addEventListener('error', onVideoError);
 
     setConnState('connecting');
     startConnectTimeout();
-    mediaRecoveryFailed = false;
+    recoveryAttempts = 0;
+    hasPlayed = false;
 
     const HlsCtor = getHlsCtor();
     const cacheBustSrc = retryCount > 0 ? `${src}${src.includes('?') ? '&' : '?'}r=${retryCount}` : src;
 
     if (HlsCtor?.isSupported()) {
-      hls = new HlsCtor(hlsConfig(withAudio));
+      hls = new HlsCtor(hlsLiveConfig(false));
       hls.loadSource(cacheBustSrc);
       hls.attachMedia(video);
       hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
@@ -189,14 +188,13 @@ export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlaye
         if (!data.fatal || !HlsCtor) return;
         switch (data.type) {
           case HlsCtor.ErrorTypes.NETWORK_ERROR:
-            hls?.startLoad();
+            if (!recoverStream()) markOffline();
             break;
           case HlsCtor.ErrorTypes.MEDIA_ERROR:
             hls?.recoverMediaError();
             break;
           default:
-            mediaRecoveryFailed = true;
-            markOffline();
+            if (!recoverStream()) markOffline();
             break;
         }
       });
@@ -214,10 +212,9 @@ export const LivePlayer = forwardRef<LivePlayerHandle, Props>(function LivePlaye
       video.removeEventListener('pause', keepPlaying);
       video.removeEventListener('playing', onVideoPlaying);
       video.removeEventListener('canplay', onVideoCanPlay);
-      video.removeEventListener('error', onVideoError);
       hls?.destroy();
     };
-  }, [src, retryCount, withAudio]);
+  }, [src, retryCount]);
 
   function handleDoubleClick(event: React.MouseEvent) {
     if (event.target instanceof Element && !event.target.closest('.video-wrap')) return;
